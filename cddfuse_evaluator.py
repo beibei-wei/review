@@ -1,107 +1,100 @@
-# 导入数值计算库
 import os
 import numpy as np
-# 导入OpenCV图像处理库
 import cv2
-# 导入sklearn机器学习指标库
 import sklearn.metrics as skm
-# 导入二维卷积函数，用于梯度、滤波计算
 from scipy.signal import convolve2d
-# 导入数学库
 import math
-# 导入结构相似性指标函数
 from skimage.metrics import structural_similarity as ssim
 import torch.nn.functional as F
 __all__ = ['Evaluator', 'image_read_cv2']
 
-# 使用OpenCV读取图像，支持RGB、灰度、YCrCb三种格式
+
 def image_read_cv2(path, mode='RGB'):
-    # 以BGR格式读取并转为浮点型
+
     img_BGR = cv2.imread(path).astype('float32')
     assert mode == 'RGB' or mode == 'GRAY' or mode == 'YCrCb', 'mode error'
     if mode == 'RGB':
-        # BGR转RGB
+
         img = cv2.cvtColor(img_BGR, cv2.COLOR_BGR2RGB)
     elif mode == 'GRAY':
-        # 转为灰度图并四舍五入取整
+
         img = np.round(cv2.cvtColor(img_BGR, cv2.COLOR_BGR2GRAY))
     elif mode == 'YCrCb':
-        # 转为亮度-色度空间
+
         img = cv2.cvtColor(img_BGR, cv2.COLOR_BGR2YCrCb)
     return img
 
-# 图像融合评价指标类，实现多种客观评价指标
 '''
 # --------------------------------------------
-# 图像质量评估指标：EN / SD / SF / AG / MI / MSE / CC / PSNR / SCD / VIF / Qabf / SSIM /
+ EN / SD / SF / AG / MI / MSE / CC / PSNR / SCD / VIF / Qabf / SSIM /
 # --------------------------------------------
 '''
 class Evaluator():
-    # 输入校验：检查图像类型、形状、维度是否合法
+
     @classmethod
     def input_check(cls, imgF, imgA=None, imgB=None):
         if imgA is None:
-            # 单图输入：检查是否为numpy数组、是否为二维灰度图
+
             assert type(imgF) == np.ndarray, 'type error'
             assert len(imgF.shape) == 2, 'dimension error'
         else:
-            # 三图输入：检查类型一致、形状一致、均为灰度图
+
             assert type(imgF) == type(imgA) == type(imgB) == np.ndarray, 'type error'
             assert imgF.shape == imgA.shape == imgB.shape, 'shape error'
             assert len(imgF.shape) == 2, 'dimension error'
 
-    # 信息熵 Entropy，反映图像信息丰富程度
+
     @classmethod
     def EN(cls, img):
         cls.input_check(img)
-        a = np.uint8(np.round(img)).flatten()    #图像数据处理：四舍五入 → 转8位无符号整数 → 展平成一维数组
-        h = np.bincount(a) / a.shape[0]          #统计每个像素值出现的频次，并计算概率分布
-        return -sum(h * np.log2(h + (h == 0)))   #计算信息熵（核心公式）
+        a = np.uint8(np.round(img)).flatten()
+        h = np.bincount(a) / a.shape[0]
+        return -sum(h * np.log2(h + (h == 0)))
 
-    # 标准差 Standard Deviation，反映图像对比度
+
     @classmethod
     def SD(cls, img):
         cls.input_check(img)
-        return np.std(img)                      # 调用 numpy 库的 std() 函数，计算图像数据的标准差
+        return np.std(img)
 
-    # 空间频率 Spatial Frequency，反映图像清晰程度
+
     @classmethod
     def SF(cls, img):
         cls.input_check(img)
         return np.sqrt(np.mean((img[:, 1:] - img[:, :-1]) ** 2) + np.mean((img[1:, :] - img[:-1, :]) ** 2))
 
-    # 平均梯度 Average Gradient，反映图像细节变化程度
+
     @classmethod
     def AG(cls, img):
         cls.input_check(img)
         Gx, Gy = np.zeros_like(img), np.zeros_like(img)
 
-        #计算水平梯度
-        Gx[:, 0] = img[:, 1] - img[:, 0]             # 左边界（第0列）处理
-        Gx[:, -1] = img[:, -1] - img[:, -2]          # 右边界（第-1列）处理
-        Gx[:, 1:-1] = (img[:, 2:] - img[:, :-2]) / 2 # 内部计算
-        #计算垂直梯度
+
+        Gx[:, 0] = img[:, 1] - img[:, 0]
+        Gx[:, -1] = img[:, -1] - img[:, -2]
+        Gx[:, 1:-1] = (img[:, 2:] - img[:, :-2]) / 2
+
         Gy[0, :] = img[1, :] - img[0, :]
         Gy[-1, :] = img[-1, :] - img[-2, :]
         Gy[1:-1, :] = (img[2:, :] - img[:-2, :]) / 2
         return np.mean(np.sqrt((Gx ** 2 + Gy ** 2) / 2))
 
-    # 互信息 Mutual Information，衡量融合图保留源图像信息多少
+
     @classmethod
     def MI(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
-        #  flatten 展平
+
         FA=skm.mutual_info_score(image_F.flatten(),image_A.flatten())
         FB=skm.mutual_info_score(image_F.flatten(),image_B.flatten())
         return FA+FB
 
-    # 均方误差 MSE，内部辅助计算函数
+
     @classmethod
     def MSE(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
         return (np.mean((image_A - image_F) ** 2) + np.mean((image_B - image_F) ** 2)) / 2
 
-    # 相关系数CC Correlation Coefficient，衡量融合图与源图线性相关程度
+
     @classmethod
     def CC(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
@@ -111,13 +104,13 @@ class Evaluator():
             (np.sum((image_B - np.mean(image_B)) ** 2)) * (np.sum((image_F - np.mean(image_F)) ** 2)))
         return (rAF + rBF) / 2
 
-    # 峰值信噪比 PSNR
+
     @classmethod
     def PSNR(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
         return 10 * np.log10(np.max(image_F) ** 2 / cls.MSE(image_F, image_A, image_B))
 
-    # 差异相关和SCD   Sum of Correlations of Differences
+
     @classmethod
     def SCD(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
@@ -129,13 +122,13 @@ class Evaluator():
             (np.sum((image_B - np.mean(image_B)) ** 2)) * (np.sum((imgF_A - np.mean(imgF_A)) ** 2)))
         return corr1 + corr2
 
-    # 视觉信息保真度 VIFF
+
     @classmethod
     def VIFF(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
         return cls.compare_viff(image_A, image_F)+cls.compare_viff(image_B, image_F)
 
-    # 计算一对参考图与失真图的VIFF值
+
     @classmethod
     def compare_viff(cls,ref, dist):
         sigma_nsq = 2
@@ -148,7 +141,7 @@ class Evaluator():
             N = 2 ** (4 - scale + 1) + 1
             sd = N / 5.0
 
-            # 构造高斯核
+
             m, n = [(ss - 1.) / 2. for ss in (N, N)]
             y, x = np.ogrid[-m:m + 1, -n:n + 1]
             h = np.exp(-(x * x + y * y) / (2. * sd * sd))
@@ -199,7 +192,7 @@ class Evaluator():
         else:
             return vifp
 
-    # Qabf 综合融合性能指标
+
     @classmethod
     def Qabf(cls, image_F, image_A, image_B):
         cls.input_check(image_F, image_A, image_B)
@@ -209,12 +202,12 @@ class Evaluator():
         QAF = cls.Qabf_getQabf(aA, gA, aF, gF)
         QBF = cls.Qabf_getQabf(aB, gB, aF, gF)
 
-        # 计算最终Qabf
+
         deno = np.sum(gA + gB)
         nume = np.sum(np.multiply(QAF, gA) + np.multiply(QBF, gB))
         return nume / deno
 
-    # Sobel算子计算梯度幅值和方向
+
     @classmethod
     def Qabf_getArray(cls,img):
         h1 = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]).astype(np.float32)
@@ -229,7 +222,7 @@ class Evaluator():
         aA[SAx != 0]=np.arctan(SAy[SAx != 0] / SAx[SAx != 0])
         return gA, aA
 
-    # 计算Qabf子项
+
     @classmethod
     def Qabf_getQabf(cls,aA, gA, aF, gF):
         L = 1
@@ -249,13 +242,13 @@ class Evaluator():
         QAF = QgAF* QaAF
         return QAF
 
-    # 结构相似性 SSIM，分别计算融合图与可见光、红外图的SSIM并相加
+
     @classmethod
     def SSIM(cls, image_F, image_A, image_B,data_range=255):
         cls.input_check(image_F, image_A, image_B)
         return ssim(image_F,image_A, data_range=data_range)+ssim(image_F,image_B, data_range=data_range)
 
-# 独立实现的VIFF计算函数，功能与类内VIFF一致
+
 def VIFF(image_F, image_A, image_B):
     refA=image_A
     refB=image_B
@@ -347,13 +340,13 @@ class Resize_16(object):
     def __init__(self):
         pass
     def __call__(self, image, target):
-        # image, target 都是 cv2 打开的 numpy 数组 (H, W, C)
-        height, width = image.shape[:2]  # cv2 图像取高宽用 shape
+
+        height, width = image.shape[:2]
 
         new_width = (width // 16) * 16
         new_height = (height // 16) * 16
         new = min(new_width, new_height)
-        # cv2 resize 用法
+
         image = cv2.resize(image, (new, new))
         target = cv2.resize(target, (new, new))
 
