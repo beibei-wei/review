@@ -5,8 +5,9 @@ from thop import profile  # 计算 GFLOPs 需要这个库
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-path_model = "model/EMMA.pth"     ## set weights path
 
+
+# path_model = "model/EMMA.pth"
 
 input_h = 480
 input_w = 640
@@ -15,19 +16,17 @@ warmup = 10
 test_times = 100
 
 
+# ===================== =====================
 def load_model():
+
     model = Ufuser().to(device)
-    model.load_state_dict(torch.load(path_model, map_location=device))
     model.eval()
     return model
 
 
-
 def count_params_and_flops(model, name="Ufuser (EMMA)"):
-
     dummy_vi = torch.randn(1, 1, input_h, input_w).to(device)
     dummy_ir = torch.randn(1, 1, input_h, input_w).to(device)
-
 
     total_params = sum(p.numel() for p in model.parameters())
     flops, _ = profile(model, inputs=(dummy_vi, dummy_ir), verbose=False)

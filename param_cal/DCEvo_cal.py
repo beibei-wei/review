@@ -6,10 +6,9 @@ import torch.nn as nn
 from sleepnet import DE_Encoder, DE_Decoder, LowFreqExtractor, HighFreqExtractor
 from thop import profile
 
-# ===================== 配置 =====================
+# ===================== =====================
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ckpt_path = "ckpt/DCEvo_fusion.pth"    ## set weights path
 
 input_h = 480
 input_w = 640
@@ -19,22 +18,12 @@ test_times = 100
 
 # =================================================================
 
-# ========== 加载模型：删除所有 DataParallel ==========
 def load_models():
-    # 直接用原始模型
+
     Encoder = DE_Encoder().to(device)
     Decoder = DE_Decoder().to(device)
     LFExtractor = LowFreqExtractor(dim=64).to(device)
     HFExtractor = HighFreqExtractor(num_layers=3).to(device)
-
-    # 加载权重
-    state = torch.load(ckpt_path, map_location=device)
-
-    # 兼容 DP 保存的权重
-    Encoder.load_state_dict({k.replace("module.", ""): v for k, v in state['DE_Encoder'].items()})
-    Decoder.load_state_dict({k.replace("module.", ""): v for k, v in state['DE_Decoder'].items()})
-    LFExtractor.load_state_dict({k.replace("module.", ""): v for k, v in state['LowFreqExtractor'].items()})
-    HFExtractor.load_state_dict({k.replace("module.", ""): v for k, v in state['HighFreqExtractor'].items()})
 
     Encoder.eval()
     Decoder.eval()
@@ -44,26 +33,22 @@ def load_models():
     return Encoder, Decoder, LFExtractor, HFExtractor
 
 
-# ========== 计算总参数量 ==========
+
 def count_total_params(Encoder, Decoder, LFExtractor, HFExtractor):
     p1 = sum(p.numel() for p in Encoder.parameters())
     p2 = sum(p.numel() for p in Decoder.parameters())
     p3 = sum(p.numel() for p in LFExtractor.parameters())
     p4 = sum(p.numel() for p in HFExtractor.parameters())
-    total = p1 + p2 + p3 + p4  # 修复这里！p5 → p4
+    total = p1 + p2 + p3 + p4
 
-    print(f"📊 Encoder 参数量：{p1 / 1e6:.2f} M")
-    print(f"📊 Decoder 参数量：{p2 / 1e6:.2f} M")
-    print(f"📊 LFExtractor 参数量：{p3 / 1e6:.2f} M")
-    print(f"📊 HFExtractor 参数量：{p4 / 1e6:.2f} M")
-    print(f"📊 模型总参数量：{total / 1e6:.2f} M")
+    print(f"Params：{total / 1e6:.2f} M")
     return total
 
 
-# ========== 计算 GFLOPs ==========
+# ==========  GFLOPs ==========
 def count_gflops(Encoder, Decoder, LFExtractor, HFExtractor):
     vi = torch.randn(1, 1, input_h, input_w).to(device)
-    ir = torch.randn(1, 1, input_h, input_w).to(device)  # 🔥 修复尺寸！
+    ir = torch.randn(1, 1, input_h, input_w).to(device)
     dummy_base = vi * 0.5 + ir * 0.5
 
     total_flops = 0
@@ -88,13 +73,13 @@ def count_gflops(Encoder, Decoder, LFExtractor, HFExtractor):
         total_flops += flops_dec
 
     total_gflops = total_flops / 1e9
-    print(f"📊 模型总计算量 GFLOPs：{total_gflops:.2f} G")
+    print(f"  GFLOPs：{total_gflops:.2f} G")
     return total_gflops
 
 
-# ========== 测试推理速度 ==========
+
 def test_speed(Encoder, Decoder, LFExtractor, HFExtractor):
-    print(f"\n🔥 预热 {warmup} 轮...")
+    print(f"warmup {warmup}  ...")
     with torch.no_grad():
         for _ in range(warmup):
             vi = torch.randn(1, 1, input_h, input_w).to(device)
@@ -106,7 +91,7 @@ def test_speed(Encoder, Decoder, LFExtractor, HFExtractor):
             ff_d = HFExtractor(fi_d + fv_d)
             fuse, _ = Decoder(vi * 0.5 + ir * 0.5, ff_b, ff_d)
 
-    print(f"🚀 测试推理速度 {test_times} 轮...")
+    print(f"test times {test_times}  ...")
     total_time = 0.0
     with torch.no_grad():
         for _ in range(test_times):
@@ -131,7 +116,7 @@ def test_speed(Encoder, Decoder, LFExtractor, HFExtractor):
     return avg_ms, fps
 
 
-# ================== 主函数 ==================
+
 if __name__ == '__main__':
     models = load_models()
 
@@ -143,6 +128,6 @@ if __name__ == '__main__':
     avg_time, fps = test_speed(*models)
 
     print("\n" + "=" * 60)
-    print(f"⚡ 平均推理时间：{avg_time:.2f} ms")
-    print(f"⚡ 推理速度 FPS：{fps:.2f}")
+    print(f"Avg Inference Time: {avg_time:.2f} ms")
+    print(f" FPS：{fps:.2f}")
     print("=" * 60)

@@ -1,9 +1,6 @@
-
 import torch
 import time
 from thop import profile
-
-# 导入你的模型
 from network.TEM import Taylor_Encoder
 from network.FusionNet import FusionModel
 
@@ -14,21 +11,14 @@ input_w = 640
 warmup = 10
 test_times = 20
 
+
 def load_models():
-    model_Taylor = 'model/Taylor_vi_epoch.pt'      ## set weights path
-    model_fusion = 'model/Fusion.pt'               ## set weights path
 
-
-    Net = Taylor_Encoder()
-    Net.load_state_dict(torch.load(model_Taylor, map_location=device))
-    Net = Net.to(device).eval()
-
-
-    Fusion = FusionModel()
-    Fusion.load_state_dict(torch.load(model_fusion, map_location=device))
-    Fusion = Fusion.to(device).eval()
+    Net = Taylor_Encoder().to(device).eval()
+    Fusion = FusionModel().to(device).eval()
 
     return Net, Fusion
+
 
 def count_params(model, name):
     total = sum(p.numel() for p in model.parameters())
@@ -36,16 +26,15 @@ def count_params(model, name):
     print(f" Params：{total / 1e6:.2f} M")
     return total
 
+
 def calculate_flops(Net, Fusion):
     with torch.no_grad():
         dummy_vis = torch.randn(1, 1, input_h, input_w).to(device)
         dummy_ir = torch.randn(1, 1, input_h, input_w).to(device)
 
-
         macs_enc, _ = profile(Net, inputs=(dummy_vis, 2), verbose=False)
         _, feat_vis = Net(dummy_vis, 2)
         _, feat_ir = Net(dummy_ir, 2)
-
 
         macs_fus, _ = profile(Fusion, inputs=(feat_vis, feat_ir), verbose=False)
 

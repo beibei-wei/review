@@ -6,7 +6,7 @@ from thop import profile
 from network_WMamba import WMamba as net
 from cut_recon import crop_image_overlap, recon_image_overlap
 
-# GPU设置
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

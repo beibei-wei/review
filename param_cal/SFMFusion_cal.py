@@ -16,14 +16,15 @@ input_h = 480
 input_w = 640
 warmup = 10
 test_times = 50
-fusion_model_path = './epoch_29.pth'    ## set weights path
 
+
+# fusion_model_path = './epoch_29.pth'
 
 
 def load_model():
     from models.model import Fusion
 
-    # 🔥 完全照搬你的模型参数
+
     net = Fusion(
         in_chans=1,
         out_chans=1,
@@ -36,21 +37,17 @@ def load_model():
     ).to(device)
 
 
-    net.load_state_dict(torch.load(fusion_model_path, map_location=device))
     net.eval()
     return net
 
 
-
 def compute_flops_params(model):
-
     vis = torch.randn(1, 1, input_h, input_w).to(device)
     ir = torch.randn(1, 1, input_h, input_w).to(device)
 
     flops, params = profile(model, inputs=(vis, ir), verbose=False)
     flops_fmt, params_fmt = clever_format([flops, params], "%.3f")
     return flops, params, flops_fmt, params_fmt
-
 
 
 def compute_speed(model):
@@ -62,14 +59,12 @@ def compute_speed(model):
         for _ in range(warmup):
             _ = model(vis, ir)
 
-
     print(f"test times: {test_times}  ...")
     total_time = 0.0
     with torch.no_grad():
         for _ in range(test_times):
             torch.cuda.synchronize()
             t0 = time.time()
-
 
             fuse_y, y, ir_out = model(vis, ir)
 
@@ -82,12 +77,10 @@ def compute_speed(model):
     return avg_time, fps
 
 
-
 if __name__ == '__main__':
     model = load_model()
     flops, params, flops_fmt, params_fmt = compute_flops_params(model)
     avg_time, fps = compute_speed(model)
-
 
     print("\n" + "=" * 70)
     print(f" Params: {params / 1e6:.2f} M   ({params_fmt})")

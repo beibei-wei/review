@@ -9,12 +9,15 @@ from thop import profile
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ckpt_path = "models/CDDFuse_IVF.pth"       ## set weights path
+
+
+# ckpt_path = "models/CDDFuse_IVF.pth"
 
 input_h = 480
 input_w = 640
 warmup = 10
 test_times = 100
+
 
 
 def load_models():
@@ -25,12 +28,6 @@ def load_models():
     DetailFuseLayer = DetailFeatureExtraction(num_layers=1).to(device)
 
 
-    state = torch.load(ckpt_path, map_location=device)
-    Encoder.load_state_dict({k.replace("module.", ""): v for k, v in state['DIDF_Encoder'].items()})
-    Decoder.load_state_dict({k.replace("module.", ""): v for k, v in state['DIDF_Decoder'].items()})
-    BaseFuseLayer.load_state_dict({k.replace("module.", ""): v for k, v in state['BaseFuseLayer'].items()})
-    DetailFuseLayer.load_state_dict({k.replace("module.", ""): v for k, v in state['DetailFuseLayer'].items()})
-
     Encoder.eval()
     Decoder.eval()
     BaseFuseLayer.eval()
@@ -38,7 +35,7 @@ def load_models():
 
     return Encoder, Decoder, BaseFuseLayer, DetailFuseLayer
 
-# ==========      ==========
+
 def count_total_params(Encoder, Decoder, BaseFuseLayer, DetailFuseLayer):
     p_enc = sum(p.numel() for p in Encoder.parameters())
     p_dec = sum(p.numel() for p in Decoder.parameters())
@@ -48,7 +45,7 @@ def count_total_params(Encoder, Decoder, BaseFuseLayer, DetailFuseLayer):
     print(f" Params: {total / 1e6:.2f} M  ")
     return total
 
-# ==========   GFLOPs ==========
+# ========== GFLOPs ==========
 def count_gflops(Encoder, Decoder, BaseFuseLayer, DetailFuseLayer):
     vi = torch.randn(1, 1, input_h, input_w).to(device)
     ir = torch.randn(1, 1, input_h, input_w).to(device)
@@ -78,7 +75,7 @@ def count_gflops(Encoder, Decoder, BaseFuseLayer, DetailFuseLayer):
     print(f" GFLOPs: {total_gflops:.2f} G  ")
     return total_gflops
 
-# ==========        ==========
+# ========== FPS ==========
 def test_speed(Encoder, Decoder, BaseFuseLayer, DetailFuseLayer):
     print(f" warmup {warmup} ...")
     with torch.no_grad():
@@ -127,7 +124,6 @@ if __name__ == '__main__':
 
     avg_time, fps = test_speed(*models)
 
-
-    print(f" Avg Inference Time {avg_time:.2f} ms")
+    print(f" Avg Inference Time: {avg_time:.2f} ms")
     print(f" FPS: {fps:.2f}")
     print("=" * 65)

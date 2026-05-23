@@ -11,7 +11,6 @@ warmup = 10
 test_times = 100
 
 
-
 def pad_to_multiple(x, multiple=32):
     B, C, H, W = x.shape
     new_h = ((H + multiple - 1) // multiple) * multiple
@@ -23,28 +22,13 @@ def pad_to_multiple(x, multiple=32):
 
 
 def load_models():
+
     dehaze_net = iassf().to(device)
     fusion_net = RestormerUNet().to(device)
-
-    saved_model_dir = 'saved_models/iassf/IASSF.pth'                 ## set weights path
-    state_dict = torch.load(saved_model_dir, map_location=device)
-
-    def load_model_state(model, state_dict):
-        model_state_dict = model.state_dict()
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            if k in model_state_dict and v.size() == model_state_dict[k].size():
-                new_state_dict[k] = v
-        model_state_dict.update(new_state_dict)
-        model.load_state_dict(model_state_dict)
-
-    load_model_state(dehaze_net, state_dict['dehaze_network_state_dict'])
-    load_model_state(fusion_net, state_dict['fusion_network_state_dict'])
 
     dehaze_net.eval()
     fusion_net.eval()
     return dehaze_net, fusion_net
-
 
 
 def count_total_params(dehaze_net, fusion_net):
@@ -66,7 +50,6 @@ def test_speed(dehaze_net, fusion_net):
             vi, _, _ = pad_to_multiple(vi)
             ir, _, _ = pad_to_multiple(ir)
 
-
             vi = vi.repeat(1, 3, 1, 1)
             ir = ir.repeat(1, 3, 1, 1)
 
@@ -82,7 +65,6 @@ def test_speed(dehaze_net, fusion_net):
 
             vi, _, _ = pad_to_multiple(vi)
             ir, _, _ = pad_to_multiple(ir)
-
 
             vi = vi.repeat(1, 3, 1, 1)
             ir = ir.repeat(1, 3, 1, 1)

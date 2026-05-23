@@ -11,7 +11,6 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -19,34 +18,24 @@ input_h = 480
 input_w = 640
 warmup = 10
 test_times = 50
-weights_path = "./Single.pth"   ## set weights path
-
 
 
 def load_model():
-
     model = WaveMamba().to(device)
-
-    state_dict = torch.load(weights_path, map_location=device)
-    new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
-    model.load_state_dict(new_state_dict)
-
+    # state_dict = torch.load(weights_path, map_location=device)
+    # new_state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+    # model.load_state_dict(new_state_dict)
     model.eval()
     return model
-
 
 
 def compute_flops_params(model):
     ir = torch.randn(1, 3, input_h, input_w).to(device)
     vi = torch.randn(1, 3, input_h, input_w).to(device)
 
-
     flops, params = profile(model, inputs=(ir, vi), verbose=False)
     flops_fmt, params_fmt = clever_format([flops, params], "%.3f")
-
     return flops, params, flops_fmt, params_fmt
-
-
 
 def compute_speed(model):
     ir = torch.randn(1, 3, input_h, input_w).to(device)
@@ -63,9 +52,7 @@ def compute_speed(model):
         for _ in range(test_times):
             torch.cuda.synchronize()
             t0 = time.time()
-
             _ = model(ir, vi)
-
             torch.cuda.synchronize()
             t1 = time.time()
             total_time += t1 - t0
@@ -74,11 +61,8 @@ def compute_speed(model):
     fps = 1000.0 / avg_time
     return avg_time, fps
 
-
-
 if __name__ == '__main__':
     model = load_model()
-
     flops, params, flops_fmt, params_fmt = compute_flops_params(model)
     avg_time, fps = compute_speed(model)
 

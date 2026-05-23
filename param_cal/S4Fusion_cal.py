@@ -2,7 +2,7 @@ import torch
 import time
 import torch.nn.functional as F
 from S4Fusion import *
-from thop import profile  # GFLOPs 计算
+from thop import profile
 
 
 device = "cuda:0"
@@ -10,7 +10,6 @@ input_h = 480
 input_w = 640
 warmup = 10
 test_times = 100
-
 
 
 def get_rest(x):
@@ -34,15 +33,11 @@ left1_pad, right1_pad, new_h = compute_pad(input_h)
 left2_pad, right2_pad, new_w = compute_pad(input_w)
 
 
-
 def load_model():
     model = MambaNet().to(device)
-    trained_model = './model/model.pkl'               ## set weights path
-    file = torch.load(trained_model, map_location=device, weights_only=False)
-    model.load_state_dict(file['model'])
+
     model.eval()
     return model
-
 
 
 def count_params(model, name="MambaNet"):
@@ -52,12 +47,10 @@ def count_params(model, name="MambaNet"):
 
 
 def count_gflops(model):
-
     dummy_ir = torch.randn(1, 1, new_h, new_w).to(device)
     dummy_vi = torch.randn(1, 1, new_h, new_w).to(device)
 
     with torch.no_grad():
-
         flops, _ = profile(model, inputs=(dummy_ir, dummy_vi), verbose=False)
 
     gflops = flops / 1e9
@@ -90,7 +83,6 @@ def test_inference_speed(model):
     avg_time = total_time / test_times * 1000
     fps = 1000 / avg_time
     return avg_time, fps
-
 
 
 if __name__ == '__main__':

@@ -11,8 +11,8 @@ import time
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-checkpoint_path = "./checkpoint/Epoch_15_iters_1200.model"               ## set weights path
 
+# checkpoint_path = "./checkpoint/Epoch_15_iters_1200.model"
 
 input_h = 480
 input_w = 640
@@ -20,10 +20,9 @@ warmup = 10
 test_times = 50
 
 
-
 def load_model():
+    # 只初始化，不加载任何权重
     model = network_fusion().to(device)
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model.eval()
 
     ct = ContourDec(nlevs=3).to(device)
@@ -44,7 +43,6 @@ def compute_flops_params(model, ct, ict):
     with torch.no_grad():
         vi64_l, vi32_l, vi16_l, vi64_h, vi32_h, vi16_h = model.vr.vi_encoder(vi, ct)
         ir64_l, ir32_l, ir16_l, ir64_h, ir32_h, ir16_h = model.vr.ir_encoder(ir, ct)
-
 
     flops_enc, _ = profile(model.vr.vi_encoder, inputs=(vi, ct), verbose=False)
     flops_fuse, _ = profile(model.feature_fusion,
@@ -69,13 +67,11 @@ def compute_speed(model, ct, ict, gra_map64):
     vi = vi[:, :, :m * 16, :n * 16]
     ir = ir[:, :, :m * 16, :n * 16]
 
-
     print(f"warmup {warmup} ...")
     with torch.no_grad():
         for _ in range(warmup):
             vi64_l, vi32_l, vi16_l, vi64_h, vi32_h, vi16_h = model.vr.vi_encoder(vi, ct)
             ir64_l, ir32_l, ir16_l, ir64_h, ir32_h, ir16_h = model.vr.ir_encoder(ir, ct)
-
 
             for k in range(8):
                 com_vi = F.pad(torch.abs(gra_map64(vi64_h[k])), (1, 1, 1, 1), mode='replicate')
@@ -94,14 +90,12 @@ def compute_speed(model, ct, ict, gra_map64):
                                                                                   vi16_l, ir16_l)
             out = model.vr.decoder(f64_l, f32_l, f16_l, vi64_h, vi32_h, vi16_h, ict)
 
-
     print(f"test times: {test_times}  ...")
     total_time = 0.0
     with torch.no_grad():
         for _ in range(test_times):
             torch.cuda.synchronize()
             t0 = time.time()
-
 
             vi64_l, vi32_l, vi16_l, vi64_h, vi32_h, vi16_h = model.vr.vi_encoder(vi, ct)
             ir64_l, ir32_l, ir16_l, ir64_h, ir32_h, ir16_h = model.vr.ir_encoder(ir, ct)
@@ -135,12 +129,8 @@ def compute_speed(model, ct, ict, gra_map64):
 if __name__ == '__main__':
     model, ct, ict, gra_map64 = load_model()
 
-
     total_flops, total_params, flops_fmt, params_fmt = compute_flops_params(model, ct, ict)
-
-
     avg_time, fps = compute_speed(model, ct, ict, gra_map64)
-
 
     print("\n" + "=" * 60)
     print(f"Params: {total_params / 1e6:.2f} M  ({params_fmt})")
